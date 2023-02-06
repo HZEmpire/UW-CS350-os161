@@ -55,7 +55,11 @@ sys_getpid(pid_t *retval)
 {
   /* for now, this is just a stub that always returns a PID of 1 */
   /* you need to fix this to make it work properly */
+  #if OPT_A1
+  *retval = curproc->p_pid;
+  #else
   *retval = 1;
+  #endif
   return(0);
 }
 
