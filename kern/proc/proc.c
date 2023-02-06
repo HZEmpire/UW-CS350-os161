@@ -51,6 +51,7 @@
 #include <synch.h>
 #include <kern/fcntl.h>  
 #include "opt-A1.h"
+#include <limits.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -215,7 +216,7 @@ proc_bootstrap(void)
 #endif // UW 
 
 #if OPT_A1
-  pid_count = PID_MIN;
+  pid_count = (unsigned int)PID_MIN;
   pid_count_mutex = sem_create("pid_count_mutex",1);
   if (pid_count_mutex == NULL) {
 	panic("could not create pid_count_mutex semaphore\n");
@@ -286,7 +287,7 @@ proc_create_runprogram(const char *name)
 
 #if OPT_A1
 	P(pid_count_mutex);
-	proc->pid = pid_count;
+	proc->p_pid = (pid_t)pid_count;
 	pid_count++;
 	V(pid_count_mutex);
 #endif

@@ -10,6 +10,8 @@
 #include <addrspace.h>
 #include <copyinout.h>
 #include "opt-A1.h"
+#include <clock.h>
+#include <mips/trapframe.h>
 
   /* this implementation of sys__exit does not do anything with the exit code */
   /* this needs to be fixed to get exit() and waitpid() working properly */
@@ -70,7 +72,38 @@ sys_getpid(pid_t *retval)
 int
 sys_fork(pid_t * retval, struct trapframe *tf)
 {
+  struct proc *child_proc = proc_create_runprogram("child");
+  if (child_proc == NULL) {
+    return ENOMEM;
+  }
 
+  //copy address space of current process to child process
+  int re = as_copy(curproc_getas(), &(child_proc->p_addrspace));
+  if (re != 0) {
+    proc_destroy(child_proc);
+    return EMPROC;
+  }
+
+  //copy trapframe of current process to child process
+  struct trapframe *child_tf = kmalloc(sizeof(struct trapframe));
+  memcpy(child_tf, tf, sizeof(struct trapframe)); 
+  if (child_tf == NULL) {
+    proc_destroy(child_proc);
+    return ENOMEM;
+  }
+
+  //create thread for child process
+  re = thread_fork("child thread", child_proc, (void *)&enter_forked_process, child_tf, 0);
+  if (re != 0) {
+    proc_destroy(child_proc);
+    return ENOMEM;
+  }
+
+  *retval = child_proc->p_pid;
+
+  clocksleep(1);
+  
+  return(0);
 }
 #endif
 
