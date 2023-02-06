@@ -9,6 +9,7 @@
 #include <thread.h>
 #include <addrspace.h>
 #include <copyinout.h>
+#include "opt-A1.h"
 
   /* this implementation of sys__exit does not do anything with the exit code */
   /* this needs to be fixed to get exit() and waitpid() working properly */
@@ -63,8 +64,18 @@ sys_getpid(pid_t *retval)
   return(0);
 }
 
-/* stub handler for waitpid() system call                */
 
+/* stub handler for waitpid() system call                */
+#if OPT_A1
+int
+sys_fork(pid_t * retval, struct trapframe *tf)
+{
+
+}
+#endif
+
+
+/* stub handler for waitpid() system call                */
 int
 sys_waitpid(pid_t pid,
 	    userptr_t status,
