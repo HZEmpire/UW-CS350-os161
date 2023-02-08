@@ -54,6 +54,12 @@ struct proc {
 	
 	#if OPT_A1
 	pid_t p_pid;			/* The process ID */
+
+	
+	struct array *p_children;	/* The children of this process */
+	struct proc *p_parent;		/* The parent of this process */
+	int p_exitcode;			/* The exit code of this process */
+	int p_exitstatus;		/* The exit status of this process */
 	#endif
 
 	struct spinlock p_lock;		/* Lock for this structure */

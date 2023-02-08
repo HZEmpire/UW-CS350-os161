@@ -111,8 +111,8 @@ syscall(struct trapframe *tf)
 		break;
 #if OPT_A1
 	case SYS_fork:
-	err = sys_fork((pid_t *)&retval, tf);
-	break;
+		err = sys_fork((pid_t *)&retval, tf);
+		break;
 #endif
 
 #ifdef UW

@@ -52,6 +52,7 @@
 #include <kern/fcntl.h>  
 #include "opt-A1.h"
 #include <limits.h>
+#include <array.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -109,6 +110,13 @@ proc_create(const char *name)
 	proc->console = NULL;
 #endif // UW
 
+#if OPT_A1
+	proc->p_children = array_create();
+	proc->p_parent = NULL;
+	proc->p_exitcode = 0;
+	proc->p_exitstatus = 0;
+#endif
+
 	return proc;
 }
 
@@ -141,6 +149,10 @@ proc_destroy(struct proc *proc)
 		VOP_DECREF(proc->p_cwd);
 		proc->p_cwd = NULL;
 	}
+
+#if OPT_A1
+	array_destroy(proc->p_children);
+#endif
 
 
 #ifndef UW  // in the UW version, space destruction occurs in sys_exit, not here
