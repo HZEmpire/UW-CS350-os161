@@ -36,6 +36,7 @@
 
 
 #include <spinlock.h>
+#include "opt-A2.h"
 
 /*
  * Dijkstra-style semaphore.
@@ -76,6 +77,12 @@ struct lock {
         char *lk_name;
         // add what you need here
         // (don't forget to mark things volatile as needed)
+#if OPT_A2
+        struct thread *lk_owner;
+        bool lk_held;
+        struct wchan *lk_wchan;
+        struct spinlock lk_spnlk;
+#endif
 };
 
 struct lock *lock_create(const char *name);
@@ -113,6 +120,9 @@ void lock_destroy(struct lock *);
 
 struct cv {
         char *cv_name;
+#if OPT_A2
+        struct wchan *cv_wchan;
+#endif
         // add what you need here
         // (don't forget to mark things volatile as needed)
 };
