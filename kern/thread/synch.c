@@ -241,6 +241,8 @@ lock_do_i_hold(struct lock *lock)
 {
         // Write this
 #if OPT_A2
+        if (lock == NULL)
+                return false;
         if (lock->lk_held == true){
                 if(lock->lk_owner == curthread)
                         return true;

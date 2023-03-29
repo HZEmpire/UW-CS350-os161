@@ -14,6 +14,11 @@
 #include <mips/trapframe.h>
 #include <array.h>
 #include <synch.h>
+#include "opt-A3.h"
+#include <vm.h>
+#include <vfs.h>
+#include <test.h>
+#include <kern/fcntl.h>
 
   /* this implementation of sys__exit does not do anything with the exit code */
   /* this needs to be fixed to get exit() and waitpid() working properly */
@@ -42,12 +47,19 @@ void sys__exit(int exitcode) {
 
 #if OPT_A1
   //iterate through the array of children
-  for (unsigned int i = 0; i < array_num(p->p_children); i++) {
+  // Fix the misundertanding in the A1
+  unsigned int num_children = array_num(p->p_children);
+  for (unsigned int i = 0; i < num_children; i++) {
     //copy the child process
-    struct proc *temp_child = (struct proc *)array_get(p->p_children, i);
+    struct proc *temp_child = (struct proc *)array_get(p->p_children, 0);
 
     //remove the child process from the parent's array
-    array_remove(p->p_children, i);
+    array_remove(p->p_children, 0);
+
+    // Case it is NULL
+    if (temp_child == NULL) {
+      continue;
+    }
 
     //check the p_exitstatus of it
     spinlock_acquire(&(temp_child->p_lock));
@@ -88,7 +100,7 @@ void sys__exit(int exitcode) {
   /* if this is the last user process in the system, proc_destroy()
      will wake up the kernel menu thread */
 
-  //proc_destroy(p);
+  proc_destroy(p);
 
 #endif
   
@@ -113,7 +125,7 @@ sys_getpid(pid_t *retval)
 }
 
 
-/* stub handler for waitpid() system call                */
+/* stub handler for fork() system call                */
 #if OPT_A1
 int
 sys_fork(pid_t * retval, struct trapframe *tf)
@@ -184,19 +196,21 @@ sys_waitpid(pid_t pid,
      Fix this!
   */
 
-  if (options != 0) {
-    return(EINVAL);
-  }
-  /* for now, just pretend the exitstatus is 0 */
-
 #if OPT_A1
   struct proc *p = curproc;
   struct proc *temp_child = NULL;
 
   //iterate through the array of children
-  for(unsigned int i = 0; i < array_num(p->p_children); i++) {
+  // Fix the misundertanding in the A1
+  unsigned int num_children = array_num(p->p_children);
+  for(unsigned int i = 0; i < num_children; i++) {
     //copy the child process
-    struct proc *cur_child = (struct proc *)array_get(p->p_children, i);
+    struct proc *cur_child = (struct proc *)array_get(p->p_children, 0);
+
+    //Skip the child process if it is NULL
+    if (cur_child == NULL) {
+      continue;
+    }
 
     //check the pid of it
     if(cur_child->p_pid == pid) {
@@ -229,6 +243,11 @@ sys_waitpid(pid_t pid,
 #else
   exitstatus = 0;
 #endif
+  // Fix the wrong place in A1
+  if (options != 0) {
+    return(EINVAL);
+  }
+  /* for now, just pretend the exitstatus is 0 */
 
   result = copyout((void *)&exitstatus,status,sizeof(int));
   if (result) {
@@ -238,3 +257,128 @@ sys_waitpid(pid_t pid,
   return(0);
 }
 
+
+# if OPT_A3
+/* stub handler for execv() system call                */
+int sys_execv(char *progname, char **argv){
+  // Directly copy from runprogram with slight modification
+  struct addrspace *as;
+	struct vnode *v;
+	vaddr_t entrypoint, stackptr;
+	int result;
+
+	/* Open the file. */
+	result = vfs_open(progname, O_RDONLY, 0, &v);
+	if (result) {
+		return result;
+	}
+
+  /* Copy the arguments into kernel space. */
+  char ** temp_argv = (char **) args_alloc();
+  unsigned long argc = argcopy_in(temp_argv, argv);
+  
+  // Record the old address space
+  struct addrspace *old_as = curproc_getas();
+
+	/* Create a new address space. */
+	as = as_create();
+	if (as ==NULL) {
+		vfs_close(v);
+		return ENOMEM;
+	}
+
+	/* Switch to it and activate it. */
+	curproc_setas(as);
+	as_activate();
+
+  /* Destroy the old address space. */
+  as_destroy(old_as);
+
+	/* Load the executable. */
+	result = load_elf(v, &entrypoint);
+	if (result) {
+		/* p_addrspace will go away when curproc is destroyed */
+		vfs_close(v);
+		return result;
+	}
+
+	/* Done with the file now. */
+	vfs_close(v);
+
+	/* Define the user stack in the address space */
+	result = as_define_stack(as, &stackptr);
+	if (result) {
+		/* p_addrspace will go away when curproc is destroyed */
+		return result;
+	}
+
+  // End with NULL for argv
+	char **new_argv = kmalloc(sizeof(vaddr_t *) * (argc + 1));
+
+	// Copy the arguments into the stack
+	for (unsigned long i = 0; i < argc; i++) {
+		new_argv[i] = (char *)argcopy_out(&stackptr, temp_argv[i]);
+	}
+	// End with NULL for argv
+	new_argv[argc] = NULL;
+
+	// Round the stack pointer down to the nearest multiple of 4 as required by MIPS
+	stackptr -= stackptr % sizeof(vaddr_t);
+	stackptr -= sizeof(vaddr_t) * (argc + 1);
+
+	// Copy the argv into the stack
+	copyout(new_argv, (userptr_t)stackptr, sizeof(vaddr_t *) * (argc + 1));
+
+  // Free the memory
+	kfree(new_argv);
+  args_free((void **)temp_argv);
+
+	enter_new_process(argc, (userptr_t) stackptr, stackptr, entrypoint);
+
+	/* enter_new_process does not return. */
+	panic("enter_new_process returned\n");
+	return EINVAL;
+}
+# endif
+
+# if OPT_A3
+// Use char ** to avoid tidious type casting in previous trial
+char **args_alloc(void){
+  //max number of arguments is 16, max number of characters is 128
+  char **argv = (char **) kmalloc(sizeof(char *) * (16 + 1));
+  for (unsigned int i = 0; i < 16; i++) {
+    argv[i] = (char *) kmalloc(sizeof(char) * (128 + 1));
+  }
+  argv[16] = NULL;
+
+  return argv;
+}
+# endif
+
+# if OPT_A3
+void args_free(void **args){
+  // Free as maximum of 16 arguments
+  for (unsigned int i = 0; i < 16; i++) {
+    kfree(args[i]);
+  }
+  kfree(args);
+  return;
+}
+# endif
+
+# if OPT_A3
+unsigned long argcopy_in(char **kern_argv, char **user_argv){
+  unsigned long argc = 0;
+
+  // Try as upper bound of 16
+  for (int i = 0; i < 16; i++) {
+    argc++;
+    if (user_argv[i] == NULL) {
+      break;
+    }
+    copyinstr((userptr_t)user_argv[i], kern_argv[i], strlen(user_argv[i]) + 1, NULL);
+  }
+
+  return argc;
+}
+# endif

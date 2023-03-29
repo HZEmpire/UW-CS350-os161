@@ -44,6 +44,8 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
+#include "opt-A3.h"
+#include <copyinout.h>
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -51,8 +53,13 @@
  *
  * Calls vfs_open on progname and thus may destroy it.
  */
+
+# if OPT_A3
+int runprogram(char *progname, unsigned long argc, char **argv)
+# else
 int
 runprogram(char *progname)
+# endif
 {
 	struct addrspace *as;
 	struct vnode *v;
@@ -96,13 +103,50 @@ runprogram(char *progname)
 		/* p_addrspace will go away when curproc is destroyed */
 		return result;
 	}
+# if OPT_A3
+	// End with NULL for argv
+	char **new_argv = kmalloc(sizeof(vaddr_t *) * (argc + 1));
 
+	// Copy the arguments into the stack
+	for (unsigned long i = 0; i < argc; i++) {
+		new_argv[i] = (char *)argcopy_out(&stackptr, argv[i]);
+	}
+	// End with NULL for argv
+	new_argv[argc] = NULL;
+
+	// Round the stack pointer down to the nearest multiple of 4 as required by MIPS
+	stackptr -= stackptr % sizeof(vaddr_t);
+	stackptr -= sizeof(vaddr_t) * (argc + 1);
+
+	// Copy the argv into the stack
+	copyout(new_argv, (userptr_t)stackptr, sizeof(vaddr_t *) * (argc + 1));
+
+	// Free the memory
+	kfree(new_argv);
+
+	/* Warp to user mode. */
+	enter_new_process(argc, (userptr_t) stackptr, stackptr, entrypoint);
+
+# else
 	/* Warp to user mode. */
 	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
 			  stackptr, entrypoint);
-	
+			  
+# endif	
 	/* enter_new_process does not return. */
 	panic("enter_new_process returned\n");
 	return EINVAL;
 }
 
+# if OPT_A3
+vaddr_t argcopy_out(vaddr_t * stackptr, char * str_out){
+	
+	// Round down to the nearest multiple of 4 as required by MIPS
+	*stackptr -= (strlen(str_out) + 1);
+
+	// Copy the string into the stack
+	copyoutstr(str_out, (userptr_t)*stackptr, (size_t)(strlen(str_out) + 1), NULL);
+	
+	return *stackptr;
+}
+# endif

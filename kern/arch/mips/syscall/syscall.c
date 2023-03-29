@@ -36,6 +36,7 @@
 #include <current.h>
 #include <syscall.h>
 #include "opt-A1.h"
+#include "opt-A3.h"
 
 
 /*
@@ -112,6 +113,12 @@ syscall(struct trapframe *tf)
 #if OPT_A1
 	case SYS_fork:
 		err = sys_fork((pid_t *)&retval, tf);
+		break;
+#endif
+
+#if OPT_A3
+	case SYS_execv:
+	  	err = sys_execv((char *)tf->tf_a0, (char**)tf->tf_a1);
 		break;
 #endif
 

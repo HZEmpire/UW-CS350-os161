@@ -1,3 +1,5 @@
+#include "opt-A3.h"
+#include <copyinout.h>
 /*
  * Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
  *	The President and Fellows of Harvard College.
@@ -82,7 +84,16 @@ int mallocstress(int, char **);
 int nettest(int, char **);
 
 /* Routine for running a user-level program. */
+# if OPT_A3
+int runprogram(char *progname, unsigned long argc, char **argv);
+# else
 int runprogram(char *progname);
+# endif
+
+# if OPT_A3
+/* Function for argument parsing. */
+vaddr_t argcopy_out(vaddr_t * stackptr, char * str_out);
+# endif
 
 /* Kernel menu system. */
 void menu(char *argstr);

@@ -1,3 +1,4 @@
+#include "opt-A3.h"
 /*
  * Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
  *	The President and Fellows of Harvard College.
@@ -64,7 +65,13 @@ void sys__exit(int exitcode);
 int sys_getpid(pid_t *retval);
 int sys_fork(pid_t *retval, struct trapframe *tf);
 int sys_waitpid(pid_t pid, userptr_t status, int options, pid_t *retval);
-
 #endif // UW
+
+#if OPT_A3
+char **args_alloc(void);
+void args_free(void **args);
+unsigned long argcopy_in(char **kern_argv, char **user_argv);
+int sys_execv(char *progname, char **argv);
+#endif
 
 #endif /* _SYSCALL_H_ */

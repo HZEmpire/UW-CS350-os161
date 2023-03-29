@@ -1,3 +1,4 @@
+#include "opt-A3.h"
 /*
  * Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
  *	The President and Fellows of Harvard College.
@@ -67,6 +68,11 @@
  */
 #define PADDR_TO_KVADDR(paddr) ((paddr)+MIPS_KSEG0)
 
+#if OPT_A3
+#define KVADDR_TO_PADDR(vaddr) ((vaddr)-MIPS_KSEG0)
+#define ALLOC_POISON -1
+#endif
+
 /*
  * The top of user space. (Actually, the address immediately above the
  * last valid user address.)
@@ -101,6 +107,9 @@
 void ram_bootstrap(void);
 paddr_t ram_stealmem(unsigned long npages);
 void ram_getsize(paddr_t *lo, paddr_t *hi);
+#if OPT_A3
+void putppages(paddr_t paddr);
+#endif
 
 /*
  * TLB shootdown bits.
