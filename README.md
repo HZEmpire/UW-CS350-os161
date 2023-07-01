@@ -1,5 +1,7 @@
 # os161 project for Waterloo CS350
 
+UW operating system design assignment. Winter 23
+
 ## A1 for fork, exit, getpid, waitpid.
 
 ## A2 for different locks.
@@ -10,4 +12,4 @@
 
 ## Please ignore 4 test commits on Feb 22.
 
-UW operating system design assignment
+
